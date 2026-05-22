@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="app-version" content="1.1.0">
+    <title>8号代码·智能收税雷达 V2.0</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-color: #1e1e1e;
+            --text-color: #ffffff;
+            --accent-green: #00e676;
+            --accent-red: #ff1744;
+            --accent-yellow: #ffea00;
+            --accent-blue: #29b6f6;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .container { max-width: 650px; width: 100%; background: var(--card-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); box-sizing: border-box; }
+        h1 { text-align: center; font-size: 22px; color: var(--accent-yellow); margin: 0 0 5px 0; }
+        .slogan { text-align: center; font-size: 12px; color: #888; margin-bottom: 14px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 8px; }
+        .btn-mini { background: transparent; color: #aaa; border: 1px solid #555; padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+        .btn-mini:hover { background: #2a2a2a; }
+
+        .notice-banner { display: none; background: #332200; border: 1px solid var(--accent-yellow); color: var(--accent-yellow); padding: 10px; border-radius: 6px; margin-bottom: 15px; text-align: center; font-size: 14px; font-weight: bold; }
+
+        .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 18px; }
+        .grid-item { background: #2a2a2a; border: 2px solid #444; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; position: relative; transition: all 0.15s; }
+        .grid-item:active { transform: scale(0.97); border-color: var(--accent-yellow); }
+        .grid-item.disabled { opacity: 0.5; pointer-events: none; }
+        .grid-left { display: flex; align-items: center; gap: 12px; }
+        .grid-item .num { font-size: 38px; font-weight: bold; line-height: 1; }
+        .grid-info { display: flex; flex-direction: column; }
+        .grid-item .code { font-size: 13px; color: #aaa; }
+        .grid-item .miss-count { font-size: 12px; margin-top: 3px; color: #ff9100; font-weight: bold; }
+        .grid-right { text-align: right; font-family: monospace; }
+        .stat-line { font-size: 12px; color: #bbb; }
+        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-top: 4px; display: inline-block; }
+        .badge-hot { background: var(--accent-red); color: white; }
+        .badge-cold { background: var(--accent-blue); color: black; margin-left: 3px; }
+
+        .radar-panel { background: #1a1a1a; border-radius: 8px; padding: 14px; margin-bottom: 16px; border-left: 5px solid #444; }
+        .radar-active { border-left-color: var(--accent-green); animation: pulse 1.5s infinite; }
+        .radar-danger { border-left-color: var(--accent-red); }
+        .radar-bust { border-left-color: var(--accent-red); background: #2a0a0a; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.75; } 100% { opacity: 1; } }
+        .radar-title { font-weight: bold; font-size: 17px; margin-bottom: 5px; }
+        .radar-text { color: #aaa; }
+        .strategy-tip { font-size: 13px; color: #bbb; }
+        .bet-line { font-size: 22px; font-weight: bold; color: var(--accent-red); margin-top: 6px; }
+
+        .ledger { display: flex; justify-content: space-between; background: #252525; padding: 12px; border-radius: 6px; margin: 12px 0; font-size: 14px; gap: 8px; flex-wrap: wrap; }
+        .ledger-item { white-space: nowrap; }
+        .recent-trail { background: #151515; border-radius: 6px; padding: 10px; margin-bottom: 10px; font-size: 13px; color: #aaa; display: flex; align-items: center; gap: 6px; }
+        .trail-dot { display: inline-block; width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 4px; font-weight: bold; }
+        .log-box { background: #151515; border-radius: 6px; padding: 10px; height: 100px; overflow-y: auto; font-size: 12px; color: #aaa; font-family: monospace; margin-bottom: 14px; }
+
+        .btn-group { display: flex; gap: 10px; justify-content: space-between; }
+        button.action-btn { background: #444; color: #fff; border: none; padding: 12px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; font-size: 14px; }
+        button.action-btn:active { background: #555; transform: scale(0.97); }
+        button.reset-btn { background: #c62828; }
+        button.reset-btn:active { background: #b71c1c; }
+
+        /* Login overlay */
+        .overlay-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-box { width: 85%; max-width: 340px; text-align: center; background: #1c1c1e; padding: 24px 20px; border-radius: 16px; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.85); }
+        .modal-input { width: 100%; padding: 12px; margin: 8px 0; background: #2c2c2e; border: 1px solid #444; color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 14px; outline: none; }
+        .modal-btn { width: 100%; padding: 14px; background: var(--accent-yellow); color: #000; font-weight: 800; border: none; border-radius: 8px; font-size: 16px; margin-top: 10px; cursor: pointer; }
+        .err-text { color: var(--accent-red); font-size: 12px; margin-top: 8px; min-height: 16px; }
+
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; display: none; justify-content: center; align-items: center; color: var(--accent-yellow); font-weight: bold; font-size: 16px; backdrop-filter: blur(3px); }
+        .locked-screen { background: #2a0a0a; border: 1px solid var(--accent-red); padding: 18px; border-radius: 8px; text-align: center; color: var(--accent-red); }
+    </style>
+</head>
+<body>
+
+<div id="loader">⚡ 引擎运算中...</div>
+
+<div id="loginLayer" class="overlay-layer">
+    <div class="modal-box">
+        <h2 style="color: var(--accent-yellow); margin-top:0;">📡 雷达终端 · 登录</h2>
+        <input type="text" id="u" class="modal-input" placeholder="访问账号">
+        <input type="password" id="p" class="modal-input" placeholder="访问密钥">
+        <button class="modal-btn" onclick="tryLogin()">启动雷达</button>
+        <div id="loginMsg" class="err-text"></div>
+    </div>
+</div>
+
+<div class="container" id="appPanel" style="display:none;">
+    <div class="top-bar">
+        <button class="btn-mini" onclick="goHome()">← 返回主终端</button>
+        <button class="btn-mini" onclick="logout()">登出</button>
+    </div>
+
+    <h1>📡 8号代码·智能收税雷达 V2.0</h1>
+    <div class="slogan">简易看板 · 动态热度 · 见8启动 · <span id="appVer"></span></div>
+
+    <div id="lockedScreen" class="locked-screen" style="display:none;">
+        ⛔ 此账号尚未分配【策略 8 · 雷达】权限<br>请联系指挥官分配后再访问。
+    </div>
+
+    <div id="mainBody" style="display:none;">
+        <div id="notice-banner" class="notice-banner"></div>
+
+        <div class="grid-container" id="gridContainer">
+            <div class="grid-item" onclick="inputCode(1)">
+                <div class="grid-left">
+                    <span class="num" style="color: #42a5f5;">1</span>
+                    <div class="grid-info">
+                        <span class="code">庄闲 (BP)</span>
+                        <span class="miss-count">漏: <span id="miss-1">0</span></span>
+                    </div>
+                </div>
+                <div class="grid-right">
+                    <div class="stat-line">出: <span id="count-1">0</span> 次</div>
+                    <div class="stat-line" style="color:#00e676;"><span id="percent-1">0</span>%</div>
+                    <div id="badge-1"></div>
+                </div>
+            </div>
+            <div class="grid-item" onclick="inputCode(2)">
+                <div class="grid-left">
+                    <span class="num" style="color: #ef5350;">2</span>
+                    <div class="grid-info">
+                        <span class="code">庄庄 (BB)</span>
+                        <span class="miss-count">漏: <span id="miss-2">0</span></span>
+                    </div>
+                </div>
+                <div class="grid-right">
+                    <div class="stat-line">出: <span id="count-2">0</span> 次</div>
+                    <div class="stat-line" style="color:#00e676;"><span id="percent-2">0</span>%</div>
+                    <div id="badge-2"></div>
+                </div>
+            </div>
+            <div class="grid-item" onclick="inputCode(3)">
+                <div class="grid-left">
+                    <span class="num" style="color: #ab47bc;">3</span>
+                    <div class="grid-info">
+                        <span class="code">闲庄 (PB)</span>
+                        <span class="miss-count">漏: <span id="miss-3">0</span></span>
+                    </div>
+                </div>
+                <div class="grid-right">
+                    <div class="stat-line">出: <span id="count-3">0</span> 次</div>
+                    <div class="stat-line" style="color:#00e676;"><span id="percent-3">0</span>%</div>
+                    <div id="badge-3"></div>
+                </div>
+            </div>
+            <div class="grid-item" onclick="inputCode(4)">
+                <div class="grid-left">
+                    <span class="num" style="color: #26a69a;">4</span>
+                    <div class="grid-info">
+                        <span class="code">闲闲 (PP)</span>
+                        <span class="miss-count">漏: <span id="miss-4">0</span></span>
+                    </div>
+                </div>
+                <div class="grid-right">
+                    <div class="stat-line">出: <span id="count-4">0</span> 次</div>
+                    <div class="stat-line" style="color:#00e676;"><span id="percent-4">0</span>%</div>
+                    <div id="badge-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="radar-status" class="radar-panel">
+            <div class="radar-title">雷达状态：<span id="radar-text" class="radar-text">扫描中...</span></div>
+            <div id="strategy-tip" class="strategy-tip">等待录入数据。</div>
+            <div id="bet-line" class="bet-line" style="display:none;"></div>
+        </div>
+
+        <div class="ledger">
+            <div class="ledger-item">当前靴收税利润：<span id="current-tax" style="color: var(--accent-green); font-weight:bold;">0</span> 码</div>
+            <div class="ledger-item">今日累计账面：<span id="total-profit" style="color:#fff; font-weight:bold;">0</span> 码</div>
+        </div>
+
+        <div class="recent-trail">
+            最近5手轨迹：
+            <span id="recent-trail-list"></span>
+        </div>
+
+        <div class="log-box" id="log">暂无数据...</div>
+
+        <div class="btn-group">
+            <button class="action-btn" onclick="sendAction('UNDO')">⏪ 撤销上一手</button>
+            <button class="action-btn reset-btn" onclick="resetShoe()">🔄 新开一靴</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = "https://quant-test-ksyx.onrender.com";
+    const APP_VERSION = "1.1.0";
+    const CODE_COLOR = { 1: '#42a5f5', 2: '#ef5350', 3: '#ab47bc', 4: '#26a69a' };
+    const CODE_LABEL = { 1: 'BP', 2: 'BB', 3: 'PB', 4: 'PP' };
+
+    let CRED = { u: '', p: '' };
+    let isBusy = false;
+    let idleTimer = 0;
+
+    window.onload = function() {
+        document.getElementById('appVer').innerText = 'v' + APP_VERSION;
+        if (localStorage.getItem('bacc_cloud_logged_in') === 'true') {
+            CRED.u = localStorage.getItem('bacc_u');
+            CRED.p = localStorage.getItem('bacc_p');
+            enterApp();
+            sendAction('STATUS_CHECK');
+            startHeartbeat();
+        }
+    };
+
+    function showLoader() { document.getElementById('loader').style.display = 'flex'; }
+    function hideLoader() { document.getElementById('loader').style.display = 'none'; }
+
+    function startHeartbeat() {
+        document.body.addEventListener('click', () => { idleTimer = 0; }, true);
+        document.body.addEventListener('touchstart', () => { idleTimer = 0; }, true);
+        setInterval(() => {
+            idleTimer++;
+            if (idleTimer >= 30) {
+                alert("⚠️ 长时间未操作，已自动登出。");
+                logout(true);
+            } else {
+                fetch(API_URL + '/api/heartbeat', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: CRED.u })
+                }).catch(e => {});
+            }
+        }, 60000);
+    }
+
+    async function tryLogin() {
+        CRED.u = document.getElementById('u').value;
+        CRED.p = document.getElementById('p').value;
+        showLoader();
+        try {
+            const response = await fetch(API_URL + '/api/action', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: CRED.u, password: CRED.p, command: 'STATUS_CHECK', triggerMode: 8, bettingMode: 'radar' })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('bacc_cloud_logged_in', 'true');
+                localStorage.setItem('bacc_u', CRED.u);
+                localStorage.setItem('bacc_p', CRED.p);
+                localStorage.setItem('bacc_trig', '8');
+                localStorage.setItem('bacc_bet', 'radar');
+                enterApp();
+                renderUI(data);
+                startHeartbeat();
+            } else {
+                document.getElementById('loginMsg').innerText = "账号或密码错误，或授权已过期";
+            }
+        } catch (e) {
+            document.getElementById('loginMsg').innerText = "连接服务器失败";
+        } finally { hideLoader(); }
+    }
+
+    function enterApp() {
+        document.getElementById('loginLayer').style.display = 'none';
+        document.getElementById('appPanel').style.display = 'block';
+    }
+
+    function logout(force = false) {
+        if (force || confirm("确定要退出雷达？")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    function goHome() {
+        window.location.href = '/';
+    }
+
+    function inputCode(num) {
+        sendAction('INPUT', String(num));
+    }
+
+    function resetShoe() {
+        if (!confirm("新开一靴会清空当前所有雷达数据。确定？")) return;
+        sendAction('RESET');
+    }
+
+    async function sendAction(command, action = null) {
+        if (isBusy) return;
+        isBusy = true;
+        if (command !== 'INPUT' && command !== 'UNDO') showLoader();
+        if (navigator.vibrate && command === 'INPUT') navigator.vibrate(30);
+
+        const gridItems = document.querySelectorAll('.grid-item');
+        gridItems.forEach(el => el.classList.add('disabled'));
+
+        try {
+            const response = await fetch(API_URL + '/api/action', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: CRED.u, password: CRED.p, command, action, triggerMode: 8, bettingMode: 'radar' })
+            });
+            if (response.status === 401 || response.status === 403) {
+                alert("授权异常，请重新登录");
+                logout(true);
+                return;
+            }
+            const data = await response.json();
+            renderUI(data);
+        } catch (e) {
+            alert("网络异常");
+        } finally {
+            hideLoader();
+            isBusy = false;
+            setTimeout(() => { gridItems.forEach(el => el.classList.remove('disabled')); }, 50);
+        }
+    }
+
+    function renderUI(S) {
+        if (!S) return;
+
+        // Permission check
+        const allowedArr = S._role === 'admin' ? ['1','2','3','4','5','6','7','8'] :
+            (S._allowedStrategies ? S._allowedStrategies.split(',').map(s => s.trim()) : []);
+        if (!allowedArr.includes('8')) {
+            document.getElementById('lockedScreen').style.display = 'block';
+            document.getElementById('mainBody').style.display = 'none';
+            return;
+        }
+        document.getElementById('lockedScreen').style.display = 'none';
+        document.getElementById('mainBody').style.display = 'block';
+
+        const r = S.radar || {
+            missCounts: {1:0,2:0,3:0,4:0}, appearCounts: {1:0,2:0,3:0,4:0},
+            totalGroups: 0, shoeTax: 0, totalProfit: 0, logs: [], recentCodes: [],
+            statusText: '扫描中...', tip: '等待录入数据。', currentBet: 0,
+            status: 'idle', notice: null, hotNum: null, coldNum: null
+        };
+
+        // 4 个格子的漏数、出现次数、百分比
+        for (let i = 1; i <= 4; i++) {
+            document.getElementById('miss-' + i).innerText = r.missCounts[i];
+            document.getElementById('count-' + i).innerText = r.appearCounts[i];
+            const pct = r.totalGroups > 0 ? Math.round((r.appearCounts[i] / r.totalGroups) * 100) : 0;
+            document.getElementById('percent-' + i).innerText = pct;
+            let badgeHTML = '';
+            if (r.hotNum === i) badgeHTML += '<span class="badge badge-hot">🔥 热门</span>';
+            if (r.coldNum === i) badgeHTML += '<span class="badge badge-cold">❄️ 冷门</span>';
+            document.getElementById('badge-' + i).innerHTML = badgeHTML;
+        }
+
+        // 雷达面板
+        const radarPanel = document.getElementById('radar-status');
+        radarPanel.className = 'radar-panel';
+        if (r.status === 'tax') radarPanel.classList.add('radar-active');
+        else if (r.status === 'besiege') radarPanel.classList.add('radar-danger');
+        else if (r.status === 'bust') radarPanel.classList.add('radar-bust');
+
+        document.getElementById('radar-text').innerText = r.statusText || '扫描中...';
+        document.getElementById('strategy-tip').innerHTML = r.tip || '';
+
+        const betLine = document.getElementById('bet-line');
+        if (r.currentBet && r.currentBet > 0) {
+            betLine.style.display = 'block';
+            betLine.innerHTML = `建议围剿注码：${r.currentBet} 码`;
+        } else {
+            betLine.style.display = 'none';
+        }
+
+        // 账本
+        document.getElementById('current-tax').innerText = r.shoeTax || 0;
+        document.getElementById('total-profit').innerText = r.totalProfit || 0;
+
+        // 最近 5 手
+        const trail = document.getElementById('recent-trail-list');
+        if (r.recentCodes && r.recentCodes.length > 0) {
+            trail.innerHTML = r.recentCodes.map(c =>
+                `<span class="trail-dot" style="background:${CODE_COLOR[c]}; color:#000;">${c}</span>`
+            ).join('');
+        } else {
+            trail.innerHTML = '<span style="color:#666;">暂无</span>';
+        }
+
+        // 日志
+        const logBox = document.getElementById('log');
+        if (r.logs && r.logs.length > 0) {
+            logBox.innerHTML = r.logs.map(l => `<div>${escapeHTML(l)}</div>`).join('');
+            logBox.scrollTop = logBox.scrollHeight;
+        } else {
+            logBox.innerText = '暂无数据...';
+        }
+
+        // 警示横幅
+        const banner = document.getElementById('notice-banner');
+        if (r.notice && r.notice.text) {
+            banner.style.display = 'block';
+            banner.innerText = r.notice.text;
+            banner.style.borderColor = r.notice.color || '#ffea00';
+            banner.style.color = r.notice.color || '#ffea00';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    function escapeHTML(s) {
+        return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+</script>
+</body>
+</html>

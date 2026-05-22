@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>司令部 - 天眼数据系统</title>
+    <style>
+        :root { --bg: #0d0d0f; --card: #1c1c1e; --text: #ffffff; --accent-blue: #0a84ff; --win-green: #32d74b; --loss-red: #ff453a; --warn-yellow: #ffd700; --border: #333; }
+        body { font-family: -apple-system, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; }
+        .header { background: #111; padding: 15px 20px; border-bottom: 2px solid var(--accent-blue); display: flex; justify-content: space-between; align-items: center; }
+        .title { font-size: 18px; font-weight: 900; color: var(--accent-blue); letter-spacing: 1px; }
+        .container { padding: 20px; max-width: 1600px; margin: 0 auto; display: none; }
+        .panel { background: var(--card); border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .panel-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #aaa; border-bottom: 1px solid #333; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;}
+        table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+        th { color: #888; padding: 10px; border-bottom: 1px solid #444; }
+        td { padding: 12px 10px; border-bottom: 1px solid #222; }
+        .btn { border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; margin-right: 4px; }
+        .btn-blue { background: var(--accent-blue); color: #fff; }
+        .btn-green { background: transparent; border: 1px solid var(--win-green); color: var(--win-green); }
+        .btn-warn { background: transparent; border: 1px solid var(--warn-yellow); color: var(--warn-yellow); }
+        .btn-red { background: transparent; border: 1px solid var(--loss-red); color: var(--loss-red); }
+        .input-box { padding: 10px; background: #2c2c2e; border: 1px solid #444; color: #fff; border-radius: 6px; margin-right: 10px; }
+        .overlay-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 9999; backdrop-filter: blur(5px); }
+        .modal-box { width: 340px; background: #1c1c1e; padding: 25px 20px; border-radius: 16px; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
+        .modal-wide { width: 90%; max-width: 1000px; max-height: 80vh; overflow-y: auto; text-align:left; }
+        .login-input { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid #444; color: #fff; box-sizing: border-box; border-radius: 6px; outline: none; }
+        .chk-row { display: flex; align-items: center; padding: 12px 10px; margin-bottom: 8px; background: #2c2c2e; border-radius: 8px; cursor: pointer; border: 1px solid #333; transition: 0.2s; }
+        .chk-box { margin-right: 12px; transform: scale(1.4); accent-color: var(--accent-blue); cursor: pointer; }
+        .chk-label { font-size: 14px; color: #ddd; font-weight: bold; cursor: pointer; user-select: none; }
+        .stat-tag { background: #333; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="loginLayer" class="overlay-layer" style="display:flex;">
+        <div class="modal-box" style="text-align: center;">
+            <h2 style="color:var(--accent-blue); margin-top:0;">天眼控制终端</h2>
+            <input type="text" id="adminU" class="login-input" placeholder="最高指挥官账号">
+            <input type="password" id="adminP" class="login-input" placeholder="访问密钥">
+            <button class="btn btn-blue" style="width:100%; padding:12px; font-size:16px; margin-top:10px;" onclick="adminLogin()">授权进入</button>
+            <div id="msg" style="color:var(--loss-red); margin-top:10px; font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <div id="historyLayer" class="overlay-layer">
+        <div class="modal-box modal-wide">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding-bottom:15px; margin-bottom:15px;">
+                <h3 style="margin:0; color:#fff;" id="historyTitle">🗂️ 运算归档明细</h3>
+                <button class="btn btn-red" onclick="document.getElementById('historyLayer').style.display='none'">关闭 X</button>
+            </div>
+            <table style="font-size: 12px;">
+                <thead>
+                    <tr><th>开始时间 (本地)</th><th>运算用时</th><th>该局记录数</th><th>该局净参数</th><th>底层运算快照 (前60条)</th></tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="permissionLayer" class="overlay-layer">
+        <div class="modal-box">
+            <h3 style="color:#fff; margin-top:0; border-bottom:1px solid #333; padding-bottom:10px;">🎯 分配运算模型</h3>
+            <div id="permUserInfo" style="color:#888; font-size:12px; margin-bottom:15px;"></div>
+            <div id="strategyCheckboxes" style="max-height: 300px; overflow-y: auto;"></div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" style="flex:1; padding:12px; background:#444; color:#fff;" onclick="closePermissionModal()">取 消</button>
+                <button class="btn btn-blue" style="flex:1; padding:12px;" onclick="savePermissions()">保 存</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="header">
+        <div class="title">💠 DATA COMMAND CENTER</div>
+        <div>
+            <button class="btn btn-warn" onclick="changeAdminPwd()">修改密钥</button>
+            <button class="btn btn-red" onclick="location.reload()">断开连接</button>
+        </div>
+    </div>
+
+    <div class="container" id="dashboard">
+        <div class="panel">
+            <div class="panel-title"><span>👥 研究员资源统筹矩阵 (实时风控雷达)</span></div>
+            <div style="margin-bottom: 20px; background: #000; padding: 15px; border-radius: 8px; border: 1px dashed #444;">
+                <input type="text" id="newUsername" class="input-box" placeholder="新研究员账号">
+                <input type="text" id="newPassword" class="input-box" placeholder="初始密码">
+                <button class="btn btn-blue" style="padding: 10px 20px;" onclick="manageUser('ADD')">➕ 发行独立终端</button>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>终端ID</th><th>账号与节点状态</th><th>今日算力(耗时/录入)</th><th>今日总参数(PL)</th><th>许可期管理</th><th>模型分配权限</th><th>终端控制指令</th></tr>
+                </thead>
+                <tbody id="usersTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://quant-test-ksyx.onrender.com"; 
+        let ADMIN_CRED = { u: '', p: '' };
+        
+        const ALL_STRATEGIES = [
+            { id: 1, label: '策略 1：2连触发 + 斐波那契' },
+            { id: 2, label: '策略 2：3连触发 + 马丁格尔' },
+            { id: 3, label: '策略 3：连续手拦截 + 马丁格尔' },
+            { id: 4, label: '策略 4：2连触发 + 拉布谢尔' },
+            { id: 5, label: '策略 5：大路四式接力 + 拉布谢尔' },
+            { id: 6, label: '策略 6：双核对冲引擎' },
+            { id: 7, label: '策略 7：自适应状态机追踪 (防伪信号 / 动态退布)' }
+        ];
+
+        let currentEditUserId = null;
+
+        // 🛡️ 后台管理同样装配“断网自动重试防御”
+        async function safeFetch(url, payload, retries = 3) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (res.status >= 500) throw new Error("Server 500");
+                    const text = await res.text();
+                    try { return { ok: res.ok, status: res.status, data: JSON.parse(text) }; } 
+                    catch(e) { throw new Error("Not JSON"); }
+                } catch (err) {
+                    if (i === retries - 1) throw err;
+                    await new Promise(r => setTimeout(r, 1000)); 
+                }
+            }
+        }
+
+        async function adminLogin() {
+            ADMIN_CRED.u = document.getElementById('adminU').value;
+            ADMIN_CRED.p = document.getElementById('adminP').value;
+            document.getElementById('msg').innerText = "加载雷达数据中...";
+            try {
+                const res = await safeFetch(API_URL + '/api/admin/data', { username: ADMIN_CRED.u, password: ADMIN_CRED.p });
+                if (res.ok) {
+                    document.getElementById('loginLayer').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+                    fetchDashboardData(); setInterval(fetchDashboardData, 10000); 
+                } else { document.getElementById('msg').innerText = "无权限，非法访问！"; }
+            } catch (err) { document.getElementById('msg').innerText = "网络断开，正在尝试重连..."; }
+        }
+
+        function formatRemainingTime(validUntilDate) {
+            let diffMs = validUntilDate - new Date();
+            if (diffMs <= 0) return "<span style='color:var(--loss-red);font-weight:bold;'>已过期</span>";
+            let d = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            return `<span style='color:#aaa;'>剩余: ${d}天</span>`;
+        }
+
+        async function fetchDashboardData() {
+            try {
+                const res = await safeFetch(API_URL + '/api/admin/data', { username: ADMIN_CRED.u, password: ADMIN_CRED.p });
+                const data = res.data;
+                
+                let statsMap = {};
+                (data.stats || []).forEach(s => { statsMap[s.username] = s; });
+
+                let usersHtml = "";
+                data.users.forEach(u => {
+                    let expiryDate = new Date(u.valid_until);
+                    let lastActive = u.last_active_at ? new Date(u.last_active_at) : null;
+                    let isOnline = false;
+                    let onlineText = '<span style="color:#666; font-size:11px;">[离线脱机]</span>';
+                    if (lastActive) {
+                        let minsAgo = (new Date() - lastActive) / 60000;
+                        if (minsAgo < 30) {
+                            isOnline = true;
+                            onlineText = `<span style="color:var(--win-green); font-size:11px; font-weight:bold; text-shadow: 0 0 5px var(--win-green);">[🟢 节点连接中]</span>`;
+                        } else {
+                            let hAgo = Math.floor(minsAgo / 60);
+                            onlineText = `<span style="color:#888; font-size:11px;">[脱机 ${hAgo} 小时]</span>`;
+                        }
+                    }
+
+                    let ts = statsMap[u.username] || { online_seconds: 0, hands_played: 0, games_played: 0, daily_pl: 0 };
+                    let todayMins = Math.floor(ts.online_seconds / 60);
+                    let plColor = ts.daily_pl > 0 ? "var(--win-green)" : (ts.daily_pl < 0 ? "var(--loss-red)" : "#888");
+                    let stratText = u.role === 'admin' ? '<span style="color:var(--warn-yellow);font-weight:bold;">全量核心组</span>' : (u.allowed_strategies ? `<span style="color:#0a84ff;font-weight:bold;">[${u.allowed_strategies}]</span>` : '<span style="color:#888">未分配模型</span>');
+
+                    usersHtml += `<tr>
+                        <td><span class="stat-tag">NODE-${u.id}</span></td>
+                        <td>
+                            <div style="font-weight:bold; color:#fff; font-size:14px;">${u.username} ${onlineText}</div>
+                            <div style="color:#666; font-size:11px;">Pwd: ${u.password}</div>
+                        </td>
+                        <td>
+                            <div style="color:#aaa; font-size:12px;">运算时长: <span style="color:#fff">${todayMins} 分钟</span></div>
+                            <div style="color:#aaa; font-size:12px;">录入量: <span style="color:#fff">${ts.games_played} 组</span> (${ts.hands_played}条记录)</div>
+                        </td>
+                        <td><span style="font-size:16px; font-weight:bold; color:${plColor}">${ts.daily_pl > 0 ? '+'+ts.daily_pl : ts.daily_pl}</span></td>
+                        <td>
+                            <div style="color:#aaa;font-size:11px;">${u.role==='admin' ? '无限期' : expiryDate.toLocaleDateString()}</div>
+                            ${u.role==='admin' ? '' : formatRemainingTime(expiryDate)}
+                        </td>
+                        <td>${stratText}</td>
+                        <td>
+                            ${u.role !== 'admin' ? `
+                                <div style="display:flex; gap:4px; margin-bottom:4px;">
+                                    <button class="btn btn-blue" onclick="viewUserHistory('${u.username}')">查阅归档</button>
+                                    <button class="btn" style="background:#5e5ce6; color:#fff;" onclick="openPermissionModal(${u.id}, '${u.username}', '${u.allowed_strategies || ''}')">配模型</button>
+                                </div>
+                                <div style="display:flex; gap:4px;">
+                                    <button class="btn btn-green" onclick="manageUser('EDIT_TIME', ${u.id})">+授权</button>
+                                    <button class="btn btn-blue" onclick="manageUser('EDIT_USER', ${u.id}, '${u.username}')">改签</button>
+                                    <button class="btn btn-warn" onclick="manageUser('TOGGLE_PAUSE', ${u.id})">${u.status==='paused' ? '解封' : '冻结'}</button>
+                                </div>
+                            ` : '-'}
+                        </td>
+                    </tr>`;
+                });
+                document.getElementById('usersTableBody').innerHTML = usersHtml;
+            } catch(e) {} // 后台轮询静默失败
+        }
+
+        async function viewUserHistory(targetUser) {
+            document.getElementById('historyTitle').innerText = `🗂️ 节点 [${targetUser}] - 运算归档明细 (最近30组样本)`;
+            document.getElementById('historyTableBody').innerHTML = '<tr><td colspan="5" style="text-align:center;">读取金库档案中...</td></tr>';
+            document.getElementById('historyLayer').style.display = 'flex';
+
+            try {
+                const res = await safeFetch(API_URL + '/api/admin/user_games', { username: ADMIN_CRED.u, password: ADMIN_CRED.p, targetUser });
+                const games = res.data;
+
+                let html = "";
+                if (!games || games.length === 0) { html = '<tr><td colspan="5" style="text-align:center; color:#888;">该节点暂无有效样本数据</td></tr>'; } 
+                else {
+                    games.forEach(g => {
+                        let stDate = new Date(g.start_time).toLocaleString(); let edDate = new Date(g.end_time);
+                        let diffMins = Math.max(1, Math.floor((edDate - new Date(g.start_time)) / 60000));
+                        let plColor = g.profit_loss > 0 ? "var(--win-green)" : (g.profit_loss < 0 ? "var(--loss-red)" : "#888");
+                        
+                        let detailsHtml = "";
+                        if (g.records_json && g.records_json.length > 0) {
+                            detailsHtml = `<div style="max-height:80px; overflow-y:auto; font-size:11px; background:#111; padding:5px; border-radius:4px; color:#aaa; font-family:monospace;">`;
+                            g.records_json.forEach(r => { detailsHtml += `[第${r.id}组] 特征:${r.h1==='B'?'0':(r.h1==='P'?'1':'-')}${r.h2==='B'?'0':(r.h2==='P'?'1':'-')} -> ${r.action.replace(/<br>/g, ' ')} | 参数波动:${r.pl}<br>`; });
+                            detailsHtml += `</div>`;
+                        } else { detailsHtml = `<span style="color:#666">空样本拦截(强制重置)</span>`; }
+
+                        html += `<tr><td style="color:#ccc;">${stDate}</td><td>${diffMins} 分钟</td><td><span class="stat-tag">${g.hands_count} 记录</span></td><td><span style="font-weight:bold; font-size:14px; color:${plColor};">${g.profit_loss > 0 ? '+'+g.profit_loss : g.profit_loss}</span></td><td>${detailsHtml}</td></tr>`;
+                    });
+                }
+                document.getElementById('historyTableBody').innerHTML = html;
+            } catch(e) { document.getElementById('historyTableBody').innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--loss-red);">网络读取超时，请关闭重试。</td></tr>'; }
+        }
+
+        function openPermissionModal(targetId, username, currentStrats) {
+            currentEditUserId = targetId;
+            let allowedArr = currentStrats ? currentStrats.split(',').map(s => s.trim()) : [];
+            document.getElementById('permUserInfo').innerHTML = `正在为节点 <span style="color:#fff; font-weight:bold; font-size:14px;">${username}</span> 分配量化模型：`;
+            let html = "";
+            ALL_STRATEGIES.forEach(str => {
+                let isChecked = allowedArr.includes(str.id.toString()) ? "checked" : "";
+                html += `<label class="chk-row"><input type="checkbox" class="chk-box strat-chk" value="${str.id}" ${isChecked}><span class="chk-label">${str.label}</span></label>`;
+            });
+            document.getElementById('strategyCheckboxes').innerHTML = html;
+            document.getElementById('permissionLayer').style.display = 'flex';
+        }
+        function closePermissionModal() { document.getElementById('permissionLayer').style.display = 'none'; currentEditUserId = null; }
+        async function savePermissions() {
+            if (!currentEditUserId) return;
+            let checkedBoxes = document.querySelectorAll('.strat-chk:checked');
+            let selectedStrats = Array.from(checkedBoxes).map(cb => cb.value).join(',');
+            await sendManageRequest({ manageAction: 'EDIT_STRATEGY', targetId: currentEditUserId, strategies: selectedStrats });
+            closePermissionModal();
+        }
+        async function changeAdminPwd() {
+            let newPwd = prompt("请输入新密钥(修改需重新登录)");
+            if (!newPwd || newPwd.trim() === '') return;
+            await sendManageRequest({ manageAction: 'CHANGE_ADMIN_PWD', newPassword: newPwd.trim() }); alert("安全密钥重置成功！"); location.reload();
+        }
+        async function manageUser(action, targetId = null, oldUsername = null) {
+            let reqBody = { manageAction: action, targetId: targetId, oldUsername: oldUsername };
+            if (action === 'ADD') {
+                reqBody.newUsername = document.getElementById('newUsername').value; reqBody.newPassword = document.getElementById('newPassword').value;
+                if (!reqBody.newUsername || !reqBody.newPassword) return alert("参数缺失！");
+            } 
+            else if (action === 'EDIT_USER') {
+                let input = prompt(`重置 NODE-${targetId} 验证凭证(空格隔开)：`); if (!input) return; 
+                let parts = input.trim().split(/\s+/); if (parts.length < 2) return alert("格式错误！");
+                reqBody.newUsername = parts[0]; reqBody.newPassword = parts[1];
+            }
+            else if (action === 'EDIT_TIME') {
+                let input = prompt(`增加授权天数(填负数即为扣减)：`, "30"); if (!input || isNaN(parseInt(input))) return; reqBody.addDays = parseInt(input);
+            }
+            else if (action === 'DELETE') { if(!confirm(`⚠️ 销毁节点 ${oldUsername} 的所有云端档案？`)) return; }
+
+            if(action !== 'TOGGLE_PAUSE' && action !== 'DELETE' && action !== 'ADD' && action !== 'EDIT_USER' && action !== 'EDIT_TIME') return;
+            await sendManageRequest(reqBody);
+        }
+        async function sendManageRequest(reqBody) {
+            reqBody.username = ADMIN_CRED.u; reqBody.password = ADMIN_CRED.p;
+            try {
+                const res = await safeFetch(API_URL + '/api/admin/manage', reqBody);
+                if(res.ok) { if (reqBody.manageAction === 'ADD') { document.getElementById('newUsername').value = ''; document.getElementById('newPassword').value = ''; } fetchDashboardData(); } 
+                else { alert("指令被云端拒绝！"); }
+            } catch(e) { alert("网络传输阻断"); }
+        }
+    </script>
+</body>
+</html>

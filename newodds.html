@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>百家乐程序牌分析器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #1a472a;
+            margin: 0;
+            padding: 16px;
+            color: #f5e6d3;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* 标题区 */
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0;
+        }
+        
+        .subtitle {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+        
+        /* 结果显示区 */
+        .stats-panel {
+            background: #0d2b1a;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .stat-card {
+            background: #2c5a3a;
+            border-radius: 12px;
+            padding: 8px 12px;
+            flex: 1;
+            text-align: center;
+            min-width: 80px;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .warning {
+            background: #8b3c2c;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            margin-top: 12px;
+            font-weight: bold;
+        }
+        
+        /* 下注建议区 */
+        .suggestion {
+            background: #2c3e2b;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            text-align: center;
+            border: 2px solid #f5b642;
+        }
+        
+        .suggestion-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .suggestion-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+        
+        .suggestion-detail {
+            font-size: 12px;
+        }
+        
+        /* 按钮区 */
+        .button-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-banker {
+            background: #d4af37;
+            color: #1a2a1a;
+        }
+        
+        .btn-player {
+            background: #7cb5a0;
+            color: #1a2a1a;
+        }
+        
+        .btn-reset {
+            background: #4a3b2a;
+            color: #f5e6d3;
+        }
+        
+        .btn:active {
+            transform: scale(0.96);
+        }
+        
+        /* 历史记录区 */
+        .history {
+            background: #0d2b1a;
+            border-radius: 16px;
+            padding: 16px;
+        }
+        
+        .history-title {
+            font-size: 14px;
+            margin-bottom: 12px;
+            font-weight: bold;
+        }
+        
+        .history-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .history-item {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .history-banker {
+            background: #d4af37;
+            color: #1a2a1a;
+        }
+        
+        .history-player {
+            background: #7cb5a0;
+            color: #1a2a1a;
+        }
+        
+        .mode-badge {
+            font-size: 10px;
+            background: #2c5a3a;
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        
+        hr {
+            border-color: #2c5a3a;
+            margin: 12px 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="title">🃏 程序牌分析器</div>
+        <div class="subtitle">实时检测压制模式 · 反向利用</div>
+    </div>
+    
+    <div class="stats-panel">
+        <div class="stat-row">
+            <div class="stat-card">
+                <div class="stat-label">连续3组全庄</div>
+                <div class="stat-value" id="statBBB">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">连续3组全闲</div>
+                <div class="stat-value" id="statPPP">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">总组数</div>
+                <div class="stat-value" id="statTotal">0</div>
+            </div>
+        </div>
+        <div id="warningArea"></div>
+    </div>
+    
+    <div class="suggestion" id="suggestionArea">
+        <div class="suggestion-label">🎯 当前建议</div>
+        <div class="suggestion-value" id="suggestion">等待数据</div>
+        <div class="suggestion-detail" id="suggestionDetail">记录至少6组后开始分析</div>
+    </div>
+    
+    <div class="button-row">
+        <button class="btn btn-banker" onclick="addResult('B')">👑 庄</button>
+        <button class="btn btn-player" onclick="addResult('P')">🃏 闲</button>
+    </div>
+    <div class="button-row">
+        <button class="btn btn-reset" onclick="resetData()">🔄 重置</button>
+        <button class="btn btn-reset" onclick="undoLast()">↩️ 撤销</button>
+    </div>
+    
+    <div class="history">
+        <div class="history-title">
+            📜 历史记录 
+            <span class="mode-badge" id="modeBadge">模式识别中</span>
+        </div>
+        <div class="history-grid" id="historyGrid"></div>
+        <hr>
+        <div style="font-size: 11px; opacity: 0.6; text-align: center;">
+            💡 说明：每2手为一组。程序牌常压制长龙，建议反向下注。
+        </div>
+    </div>
+</div>
+
+<script>
+    // 存储数据
+    let results = [];      // 存储每手: 'B' 或 'P'
+    let groups = [];       // 存储每组: 'BB', 'BP', 'PB', 'PP'
+    
+    // 更新界面
+    function updateUI() {
+        updateGroups();
+        updateStats();
+        updateSuggestion();
+        updateHistory();
+        updateModeBadge();
+    }
+    
+    // 将results转换为groups
+    function updateGroups() {
+        groups = [];
+        for (let i = 0; i < results.length - 1; i += 2) {
+            let group = results[i] + results[i+1];
+            groups.push(group);
+        }
+    }
+    
+    // 统计连续3组全庄/全闲
+    function countPatterns() {
+        let bbbCount = 0;
+        let pppCount = 0;
+        
+        for (let i = 0; i <= groups.length - 3; i++) {
+            let g1 = groups[i];
+            let g2 = groups[i+1];
+            let g3 = groups[i+2];
+            
+            // 连续3组全庄：每组都是 'BB'
+            if (g1 === 'BB' && g2 === 'BB' && g3 === 'BB') {
+                bbbCount++;
+            }
+            // 连续3组全闲：每组都是 'PP'
+            if (g1 === 'PP' && g2 === 'PP' && g3 === 'PP') {
+                pppCount++;
+            }
+        }
+        return { bbbCount, pppCount };
+    }
+    
+    // 更新统计面板
+    function updateStats() {
+        const { bbbCount, pppCount } = countPatterns();
+        document.getElementById('statBBB').innerText = bbbCount;
+        document.getElementById('statPPP').innerText = pppCount;
+        document.getElementById('statTotal').innerText = groups.length;
+        
+        // 警告区
+        const warningDiv = document.getElementById('warningArea');
+        let warnings = [];
+        
+        if (groups.length >= 10) {
+            if (bbbCount === 0) {
+                warnings.push('⚠️ 警告：从未出现连续3组全庄 → 程序牌在压制长庄！');
+            }
+            if (pppCount === 0) {
+                warnings.push('⚠️ 警告：从未出现连续3组全闲 → 程序牌在压制长闲！');
+            }
+        }
+        
+        if (warnings.length > 0) {
+            warningDiv.innerHTML = `<div class="warning">${warnings.join('<br>')}</div>`;
+        } else {
+            warningDiv.innerHTML = '';
+        }
+    }
+    
+    // 检测周期模式（简单版：检测双跳和单跳）
+    function detectPattern() {
+        if (groups.length < 4) return 'unknown';
+        
+        let last4 = groups.slice(-4);
+        
+        // 检测双跳模式: BBPPBBPP 或 PPBBPPBB
+        let isDoubleJump = false;
+        if (last4[0] === last4[2] && last4[1] === last4[3] && 
+            last4[0] !== last4[1] && 
+            (last4[0] === 'BB' || last4[0] === 'PP')) {
+            isDoubleJump = true;
+        }
+        
+        // 检测单跳模式: BPBP 或 PBPB（每组内可能混，简化检测）
+        let last4GroupsStr = last4.join('');
+        let isSingleJump = (last4GroupsStr === 'BPBP' || last4GroupsStr === 'PBPB' ||
+                           last4GroupsStr === 'PBPB' || last4GroupsStr === 'BPBP');
+        
+        if (isDoubleJump) return 'double_jump';
+        if (isSingleJump) return 'single_jump';
+        
+        return 'unknown';
+    }
+    
+    // 更新模式徽章
+    function updateModeBadge() {
+        const pattern = detectPattern();
+        const badge = document.getElementById('modeBadge');
+        if (pattern === 'double_jump') {
+            badge.innerHTML = '🔁 双跳模式 (BBPP)';
+            badge.style.background = '#f5b642';
+            badge.style.color = '#1a2a1a';
+        } else if (pattern === 'single_jump') {
+            badge.innerHTML = '↗️ 单跳模式 (BPBP)';
+            badge.style.background = '#f5b642';
+            badge.style.color = '#1a2a1a';
+        } else {
+            badge.innerHTML = '📊 常规模式';
+            badge.style.background = '#2c5a3a';
+            badge.style.color = '#f5e6d3';
+        }
+    }
+    
+    // 更新下注建议
+    function updateSuggestion() {
+        const { bbbCount, pppCount } = countPatterns();
+        const pattern = detectPattern();
+        const groupsLen = groups.length;
+        
+        let suggestion = '';
+        let detail = '';
+        
+        if (groupsLen < 3) {
+            suggestion = '等待数据';
+            detail = '记录至少3组(6手)后开始分析';
+        } 
+        // 策略A：压制长庄
+        else if (groupsLen >= 8 && bbbCount === 0) {
+            // 检查最近一组是否接近形成长庄
+            let lastGroup = groups[groupsLen - 1];
+            let secondLast = groups[groupsLen - 2];
+            if (lastGroup === 'BB' && secondLast === 'BB') {
+                suggestion = '🎲 押 闲';
+                detail = '已出现2组全庄，程序牌压制长庄 → 下一组必不是全庄，押闲胜率高';
+            } else {
+                suggestion = '🎲 等待时机';
+                detail = '程序牌压制长庄，等待出现2组全庄后反打';
+            }
+        }
+        // 策略B：压制长闲
+        else if (groupsLen >= 8 && pppCount === 0) {
+            let lastGroup = groups[groupsLen - 1];
+            let secondLast = groups[groupsLen - 2];
+            if (lastGroup === 'PP' && secondLast === 'PP') {
+                suggestion = '🎲 押 庄';
+                detail = '已出现2组全闲，程序牌压制长闲 → 下一组必不是全闲，押庄胜率高';
+            } else {
+                suggestion = '🎲 等待时机';
+                detail = '程序牌压制长闲，等待出现2组全闲后反打';
+            }
+        }
+        // 策略C：跟周期
+        else if (pattern === 'double_jump') {
+            let lastGroup = groups[groupsLen - 1];
+            let predicted = (lastGroup === 'BB') ? 'PP' : 'BB';
+            if (predicted === 'BB') {
+                suggestion = '👑 押 庄庄 (两把庄)';
+                detail = '双跳模式，跟周期下注';
+            } else {
+                suggestion = '🃏 押 闲闲 (两把闲)';
+                detail = '双跳模式，跟周期下注';
+            }
+        }
+        else if (pattern === 'single_jump') {
+            let lastResult = results[results.length - 1];
+            let predicted = (lastResult === 'B') ? 'P' : 'B';
+            suggestion = (predicted === 'B') ? '👑 押 庄' : '🃏 押 闲';
+            detail = '单跳模式，跟跳下注';
+        }
+        // 默认建议
+        else {
+            suggestion = '📊 常规分析';
+            detail = '暂未检测到压制或周期模式，建议小注观察';
+        }
+        
+        document.getElementById('suggestion').innerHTML = suggestion;
+        document.getElementById('suggestionDetail').innerHTML = detail;
+    }
+    
+    // 更新历史显示
+    function updateHistory() {
+        const grid = document.getElementById('historyGrid');
+        grid.innerHTML = '';
+        
+        // 显示最近30手
+        let displayResults = results.slice(-30);
+        displayResults.forEach((r, idx) => {
+            const div = document.createElement('div');
+            div.className = `history-item ${r === 'B' ? 'history-banker' : 'history-player'}`;
+            div.innerText = r === 'B' ? '庄' : '闲';
+            grid.appendChild(div);
+        });
+        
+        if (results.length === 0) {
+            grid.innerHTML = '<div style="width:100%; text-align:center; opacity:0.5;">点击庄或闲开始记录</div>';
+        }
+    }
+    
+    // 添加结果
+    function addResult(type) {
+        results.push(type);
+        updateUI();
+    }
+    
+    // 重置
+    function resetData() {
+        results = [];
+        groups = [];
+        updateUI();
+    }
+    
+    // 撤销
+    function undoLast() {
+        results.pop();
+        updateUI();
+    }
+    
+    // 初始化
+    updateUI();
+</script>
+</body>
+</html>
