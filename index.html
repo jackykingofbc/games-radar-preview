@@ -193,7 +193,7 @@
             if (localStorage.getItem('bacc_cloud_logged_in') === 'true') {
                 CRED.u = localStorage.getItem('bacc_u'); CRED.p = localStorage.getItem('bacc_p');
                 let savedTrig = localStorage.getItem('bacc_trig'), savedBet = localStorage.getItem('bacc_bet');
-                if (savedTrig === '8' || parseInt(savedTrig) === 8) { window.location.href = '/radar8.html'; return; }
+                if (savedTrig === '8' || parseInt(savedTrig) === 8) { window.location.href = 'radar8.html'; return; }
                 if(savedTrig) currentTriggerMode = savedTrig === 'hand' ? 'hand' : parseInt(savedTrig);
                 if(savedBet) currentBettingMode = savedBet;
                 enterApp(); sendAction('STATUS_CHECK');
@@ -253,7 +253,7 @@
             if (comboValue[0] === '8') {
                 localStorage.setItem('bacc_trig', '8');
                 localStorage.setItem('bacc_bet', 'radar');
-                window.location.href = '/radar8.html';
+                window.location.href = 'radar8.html';
                 return;
             }
             currentTriggerMode = comboValue[0] === 'hand' ? 'hand' : parseInt(comboValue[0]);
@@ -289,7 +289,7 @@
                 if (S.triggerMode === 8) {
                     localStorage.setItem('bacc_trig', '8');
                     localStorage.setItem('bacc_bet', 'radar');
-                    window.location.href = '/radar8.html';
+                    window.location.href = 'radar8.html';
                     return;
                 }
 
