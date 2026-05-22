@@ -212,19 +212,51 @@
     let isBusy = false;
     let idleTimer = 0;
 
-    window.onload = function() {
+    window.onload = async function() {
         document.getElementById('appVer').innerText = 'v' + APP_VERSION;
         if (localStorage.getItem('bacc_cloud_logged_in') === 'true') {
             CRED.u = localStorage.getItem('bacc_u');
             CRED.p = localStorage.getItem('bacc_p');
             enterApp();
-            sendAction('STATUS_CHECK');
-            startHeartbeat();
+            const ok = await wakeBackend();
+            if (ok) {
+                sendAction('STATUS_CHECK');
+                startHeartbeat();
+            }
         }
     };
 
-    function showLoader() { document.getElementById('loader').style.display = 'flex'; }
+    function showLoader(text) {
+        const l = document.getElementById('loader');
+        if (text) l.innerText = text;
+        l.style.display = 'flex';
+    }
     function hideLoader() { document.getElementById('loader').style.display = 'none'; }
+
+    // Render 免费档 15 分钟无请求会休眠，冷启动 30-60s。先用 GET / ping 唤醒后再发业务请求。
+    async function wakeBackend() {
+        const startedAt = Date.now();
+        showLoader('🛠 唤醒云端引擎（首次约 30-60 秒，冷启动）...');
+        for (let attempt = 1; attempt <= 8; attempt++) {
+            try {
+                const ctl = new AbortController();
+                const t = setTimeout(() => ctl.abort(), 20000);
+                const r = await fetch(API_URL + '/?_wake=' + Date.now(), { signal: ctl.signal, cache: 'no-store' });
+                clearTimeout(t);
+                if (r.ok) {
+                    const sec = ((Date.now() - startedAt) / 1000).toFixed(1);
+                    showLoader(`✅ 引擎已就绪 (${sec}s)`);
+                    await new Promise(res => setTimeout(res, 300));
+                    hideLoader();
+                    return true;
+                }
+            } catch (e) {
+                showLoader(`🛠 等待引擎唤醒... (${attempt}/8)`);
+            }
+        }
+        showLoader('⚠️ 引擎唤醒超时，刷新页面重试');
+        return false;
+    }
 
     function startHeartbeat() {
         document.body.addEventListener('click', () => { idleTimer = 0; }, true);
@@ -246,12 +278,21 @@
     async function tryLogin() {
         CRED.u = document.getElementById('u').value;
         CRED.p = document.getElementById('p').value;
-        showLoader();
+        const woken = await wakeBackend();
+        if (!woken) {
+            document.getElementById('loginMsg').innerText = "云端引擎未就绪，请稍后重试";
+            return;
+        }
+        showLoader('⚡ 验证身份中...');
         try {
+            const ctl = new AbortController();
+            const t = setTimeout(() => ctl.abort(), 30000);
             const response = await fetch(API_URL + '/api/action', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: CRED.u, password: CRED.p, command: 'STATUS_CHECK', triggerMode: 8, bettingMode: 'radar' })
+                body: JSON.stringify({ username: CRED.u, password: CRED.p, command: 'STATUS_CHECK', triggerMode: 8, bettingMode: 'radar' }),
+                signal: ctl.signal
             });
+            clearTimeout(t);
             if (response.ok) {
                 const data = await response.json();
                 localStorage.setItem('bacc_cloud_logged_in', 'true');
@@ -266,7 +307,7 @@
                 document.getElementById('loginMsg').innerText = "账号或密码错误，或授权已过期";
             }
         } catch (e) {
-            document.getElementById('loginMsg').innerText = "连接服务器失败";
+            document.getElementById('loginMsg').innerText = e.name === 'AbortError' ? "连接超时，请重试" : "连接服务器失败";
         } finally { hideLoader(); }
     }
 
@@ -298,17 +339,26 @@
     async function sendAction(command, action = null) {
         if (isBusy) return;
         isBusy = true;
-        if (command !== 'INPUT' && command !== 'UNDO') showLoader();
+        const loaderText = command === 'INPUT' ? `⚡ 录入 ${action} 中...` :
+            command === 'UNDO' ? '⏪ 撤销中...' :
+            command === 'RESET' ? '🔄 重置中...' :
+            command === 'UPDATE_SETTINGS' ? '🔄 切换策略中...' :
+            '⚡ 引擎运算中...';
+        showLoader(loaderText);
         if (navigator.vibrate && command === 'INPUT') navigator.vibrate(30);
 
         const gridItems = document.querySelectorAll('.grid-item');
         gridItems.forEach(el => el.classList.add('disabled'));
 
         try {
+            const ctl = new AbortController();
+            const t = setTimeout(() => ctl.abort(), 30000);
             const response = await fetch(API_URL + '/api/action', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: CRED.u, password: CRED.p, command, action, triggerMode: 8, bettingMode: 'radar' })
+                body: JSON.stringify({ username: CRED.u, password: CRED.p, command, action, triggerMode: 8, bettingMode: 'radar' }),
+                signal: ctl.signal
             });
+            clearTimeout(t);
             if (response.status === 401 || response.status === 403) {
                 alert("授权异常，请重新登录");
                 logout(true);
@@ -317,7 +367,8 @@
             const data = await response.json();
             renderUI(data);
         } catch (e) {
-            alert("网络异常");
+            if (e.name === 'AbortError') alert('请求超时（30s）。引擎可能在冷启动，请稍后再试。');
+            else alert('网络异常：' + (e.message || '未知错误'));
         } finally {
             hideLoader();
             isBusy = false;
