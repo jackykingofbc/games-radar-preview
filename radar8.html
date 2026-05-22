@@ -339,6 +339,13 @@
         document.getElementById('lockedScreen').style.display = 'none';
         document.getElementById('mainBody').style.display = 'block';
 
+        // 服务端 state 可能还停在别的策略（从 index 跳过来时未切换）。主动切到 8 再渲染。
+        if (S.triggerMode !== 8) {
+            document.getElementById('strategy-tip').innerText = '🔄 切换到雷达模式中...';
+            setTimeout(() => sendAction('UPDATE_SETTINGS'), 50);
+            return;
+        }
+
         const r = S.radar || {
             missCounts: {1:0,2:0,3:0,4:0}, appearCounts: {1:0,2:0,3:0,4:0},
             totalGroups: 0, shoeTax: 0, totalProfit: 0, logs: [], recentCodes: [],
